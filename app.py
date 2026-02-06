@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
 from models import db, User, Product, CartItem, Order, OrderItem
 from app.routes.product_routes import product_bp
 
 app = Flask(__name__)
+CORS(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://ahmed:ahmed123@localhost/beauty_shop"
 app.config["JWT_SECRET_KEY"] = "super-secret-key"  
 
