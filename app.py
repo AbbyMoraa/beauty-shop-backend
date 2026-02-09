@@ -1,13 +1,35 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
 from models import db, User, Product, CartItem, Order, OrderItem
+from app.routes.product_routes import product_bp
 
 app = Flask(__name__)
+CORS(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://ahmed:ahmed123@localhost/beauty_shop"
-app.config["JWT_SECRET_KEY"] = "super-secret-key"  # change to something secure
+app.config["JWT_SECRET_KEY"] = "super-secret-key"  
 
 db.init_app(app)
 jwt = JWTManager(app)
+
+#registed product routes
+app.register_blueprint(product_bp)
+
+@app.route("/")
+def home():
+    return jsonify({
+        "message": "Beauty Shop API",
+        "endpoints": {
+            "products": "/products",
+            "categories": "/categories",
+            "cart": "/cart",
+            "checkout": "/checkout",
+            "auth": {
+                "register": "/register",
+                "login": "/login"
+            }
+        }
+    })
 
 # -------------------- AUTH --------------------
 @app.route("/register", methods=["POST"])
@@ -27,16 +49,8 @@ def login():
     token = create_access_token(identity=user.id)
     return jsonify({"access_token": token}), 200
 
-# -------------------- PRODUCTS --------------------
-@app.route("/products", methods=["GET"])
-def list_products():
-    products = Product.query.all()
-    return jsonify([
-        {"id": p.id, "name": p.name, "price": p.price}
-        for p in products
-    ])
 
-# -------------------- CART --------------------
+# CART
 @app.route("/cart", methods=["GET"])
 @jwt_required()
 def view_cart():
@@ -65,7 +79,7 @@ def add_to_cart():
     db.session.commit()
     return jsonify({"message": "Item added to cart"}), 201
 
-# -------------------- CHECKOUT --------------------
+# Checkout
 @app.route("/checkout", methods=["POST"])
 @jwt_required()
 def checkout():
@@ -103,8 +117,11 @@ def checkout():
 
     return jsonify({"message": "Checkout successful", "order_id": order.id, "total": total}), 201
 
-# -------------------- MAIN --------------------
+# main
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()  # ensures tables exist if migrations already applied
-    app.run()
+        db.create_all()
+        print("\nRegistered routes:")
+        for rule in app.url_map.iter_rules():
+            print(f"  {rule}")
+    app.run(debug=True)
