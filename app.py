@@ -15,6 +15,22 @@ jwt = JWTManager(app)
 #registed product routes
 app.register_blueprint(product_bp)
 
+@app.route("/")
+def home():
+    return jsonify({
+        "message": "Beauty Shop API",
+        "endpoints": {
+            "products": "/products",
+            "categories": "/categories",
+            "cart": "/cart",
+            "checkout": "/checkout",
+            "auth": {
+                "register": "/register",
+                "login": "/login"
+            }
+        }
+    })
+
 # -------------------- AUTH --------------------
 @app.route("/register", methods=["POST"])
 def register():
