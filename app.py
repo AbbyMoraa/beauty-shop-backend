@@ -99,6 +99,17 @@ def get_current_user():
         "role": user.role
     }), 200
 
+@app.route("/users", methods=["GET"])
+def get_users():
+    users = User.query.all()
+    return jsonify([{
+        "id": u.id,
+        "username": u.username,
+        "email": u.email,
+        "role": u.role,
+        "created_at": str(u.created_at)
+    } for u in users])
+
 # -------------------- CART --------------------
 @app.route("/cart", methods=["GET"])
 @jwt_required()
