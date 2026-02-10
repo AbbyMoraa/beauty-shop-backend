@@ -2,8 +2,6 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
 from models import db, User, Product, CartItem, Order, OrderItem, Category
-from app.routes.product_routes import product_bp
-from admin.routes.admin_routes import admin_bp
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://ahmed:ahmed123@localhost/beauty_shop"
@@ -14,10 +12,6 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 db.init_app(app)
 jwt = JWTManager(app)
-
-# Register blueprints
-app.register_blueprint(product_bp)
-app.register_blueprint(admin_bp)
 @app.route("/")
 def home():
     return jsonify({
@@ -39,6 +33,13 @@ def home():
 def get_products():
     products = Product.query.all()
     return jsonify([p.to_dict() for p in products])
+
+@app.route("/products/<int:id>", methods=["GET"])
+def get_product(id):
+    product = Product.query.get(id)
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+    return jsonify(product.to_dict())
 
 @app.route("/categories", methods=["GET"])
 def get_categories():
@@ -74,7 +75,15 @@ def login():
         return jsonify({"error": "Invalid credentials"}), 401
 
     token = create_access_token(identity=user.id)
-    return jsonify({"access_token": token}), 200
+    return jsonify({
+        "access_token": token,
+        "user": {
+            "id": user.id,
+            "name": user.username,
+            "email": user.email,
+            "role": user.role
+        }
+    }), 200
 
 @app.route("/me", methods=["GET"])
 @jwt_required()
@@ -85,7 +94,7 @@ def get_current_user():
         return jsonify({"error": "User not found"}), 404
     return jsonify({
         "id": user.id,
-        "username": user.username,
+        "name": user.username,
         "email": user.email,
         "role": user.role
     }), 200
