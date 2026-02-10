@@ -1,5 +1,7 @@
 from flask import jsonify, request
-from models import db, Product, Category
+from app.models.product import Product
+from app.models.category import Category
+from app.extensions import db
 
 class ProductController:
     

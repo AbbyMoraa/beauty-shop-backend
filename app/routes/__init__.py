@@ -1,5 +1,5 @@
 from flask import Flask
-from app.extensions import db, migrate
+from app.extensions import db
 
 def create_app():
     app = Flask(__name__)

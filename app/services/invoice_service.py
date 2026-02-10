@@ -5,9 +5,14 @@ from app.extensions import db
 class InvoiceService:
     @staticmethod
     def create_invoice(order):
+        existing = Invoice.query.filter_by(order_id=order.id).first()
+        if existing:
+            return existing
+        
+        invoice_number = f"INV-{str(uuid.uuid4())[:8].upper()}"
         invoice = Invoice(
             order_id=order.id,
-            invoice_number=str(uuid.uuid4()),
+            invoice_number=invoice_number,
             amount=order.total_price,
             status="PAID"
         )
