@@ -1,18 +1,27 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
+from flask_jwt_extended import (
+    JWTManager,
+    jwt_required,
+    get_jwt_identity,
+    create_access_token
+)
+
 from models import db, User, Product, CartItem, Order, OrderItem
 from app.routes.product_routes import product_bp
+from app.services.payment_service import PaydPaymentService
+from app.services.invoice_service import InvoiceService
 
 app = Flask(__name__)
 CORS(app)
+
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://ahmed:ahmed123@localhost/beauty_shop"
-app.config["JWT_SECRET_KEY"] = "super-secret-key"  
+app.config["JWT_SECRET_KEY"] = "super-secret-key"
 
 db.init_app(app)
 jwt = JWTManager(app)
 
-#registed product routes
+# Register product routes
 app.register_blueprint(product_bp)
 
 @app.route("/")
@@ -40,22 +49,29 @@ def register():
     db.session.commit()
     return jsonify({"message": "User registered"}), 201
 
+
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
-    user = User.query.filter_by(username=data["username"], password=data["password"]).first()
+    user = User.query.filter_by(
+        username=data["username"],
+        password=data["password"]
+    ).first()
+
     if not user:
         return jsonify({"error": "Invalid credentials"}), 401
+
     token = create_access_token(identity=user.id)
     return jsonify({"access_token": token}), 200
 
 
-# CART
+# -------------------- CART --------------------
 @app.route("/cart", methods=["GET"])
 @jwt_required()
 def view_cart():
     user_id = get_jwt_identity()
     items = CartItem.query.filter_by(user_id=user_id).all()
+
     return jsonify([
         {
             "product_id": i.product_id,
@@ -66,32 +82,42 @@ def view_cart():
         for i in items
     ])
 
+
 @app.route("/cart", methods=["POST"])
 @jwt_required()
 def add_to_cart():
     user_id = get_jwt_identity()
     data = request.get_json()
+
     product_id = data["product_id"]
     quantity = data.get("quantity", 1)
 
-    item = CartItem(user_id=user_id, product_id=product_id, quantity=quantity)
+    item = CartItem(
+        user_id=user_id,
+        product_id=product_id,
+        quantity=quantity
+    )
+
     db.session.add(item)
     db.session.commit()
+
     return jsonify({"message": "Item added to cart"}), 201
 
-# Checkout
+
+# -------------------- CHECKOUT  --------------------
 @app.route("/checkout", methods=["POST"])
 @jwt_required()
 def checkout():
     user_id = get_jwt_identity()
     cart_items = CartItem.query.filter_by(user_id=user_id).all()
+
     if not cart_items:
         return jsonify({"error": "Cart is empty"}), 400
 
     total = 0
     order = Order(user_id=user_id, total_price=0)
     db.session.add(order)
-    db.session.flush()
+    db.session.flush()  # get order.id
 
     for item in cart_items:
         product = Product.query.get(item.product_id)
@@ -112,12 +138,46 @@ def checkout():
     order.total_price = total
     db.session.commit()
 
+    # Clear cart
     CartItem.query.filter_by(user_id=user_id).delete()
     db.session.commit()
 
-    return jsonify({"message": "Checkout successful", "order_id": order.id, "total": total}), 201
+    # -------- PAYD PAYMENT  --------
+    phone_number = request.json.get("phone_number")
 
-# main
+    if not phone_number:
+        return jsonify({"error": "Phone number is required for payment"}), 400
+
+    payment_response, status = PaydPaymentService.initiate_payment(
+        amount=total,
+        phone_number=phone_number,
+        narration=f"Order #{order.id}",
+        callback_url="https://your-backend.com/payments/callback"
+    )
+
+    if status not in [200, 201]:
+        return jsonify({
+            "error": "Payment initiation failed",
+            "details": payment_response
+        }), 400
+
+    # -------- INVOICE GENERATION  --------
+    invoice = InvoiceService.create_invoice(order)
+
+    return jsonify({
+        "message": "Checkout successful",
+        "order_id": order.id,
+        "total": total,
+        "payment": payment_response,
+        "invoice": {
+            "invoice_number": invoice.invoice_number,
+            "amount": invoice.amount,
+            "status": invoice.status
+        }
+    }), 201
+
+
+# -------------------- MAIN --------------------
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
