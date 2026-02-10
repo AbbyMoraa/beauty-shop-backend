@@ -1,5 +1,5 @@
 from flask import Flask
-from app.extensions import db, migrate
+from app.extensions import db
 
 def create_app():
     app = Flask(__name__)
@@ -9,7 +9,6 @@ def create_app():
     app.config["SECRET_KEY"] = "supersecretkey"
 
     db.init_app(app)
-    migrate.init_app(app, db)
 
     # ONLY register routes that actually exist
     try:

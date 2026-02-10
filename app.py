@@ -1,19 +1,16 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
-from models import db, User, Product, CartItem, Order, OrderItem
-from app.routes.product_routes import product_bp
+from models import db, User, Product, CartItem, Order, OrderItem, Category
 
 app = Flask(__name__)
-CORS(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://ahmed:ahmed123@localhost/beauty_shop"
 app.config["JWT_SECRET_KEY"] = "super-secret-key"  
 
+CORS(app, resources={r"/*": {"origins": "*"}})
+
 db.init_app(app)
 jwt = JWTManager(app)
-
-#registed product routes
-app.register_blueprint(product_bp)
 
 @app.route("/")
 def home():
@@ -31,23 +28,60 @@ def home():
         }
     })
 
+# -------------------- PRODUCTS --------------------
+@app.route("/products", methods=["GET"])
+def get_products():
+    products = Product.query.all()
+    return jsonify([p.to_dict() for p in products])
+
+@app.route("/categories", methods=["GET"])
+def get_categories():
+    categories = Category.query.all()
+    return jsonify([c.to_dict() for c in categories])
+
 # -------------------- AUTH --------------------
 @app.route("/register", methods=["POST"])
 def register():
-    data = request.get_json()
-    user = User(username=data["username"], password=data["password"])
-    db.session.add(user)
-    db.session.commit()
-    return jsonify({"message": "User registered"}), 201
+    try:
+        data = request.get_json()
+        email = data.get("email")
+        password = data.get("password")
+        username = data.get("username", email.split("@")[0])  # Use email prefix if no username
+        
+        if User.query.filter_by(email=email).first():
+            return jsonify({"error": "Email already exists"}), 400
+        
+        user = User(username=username, email=email)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        return jsonify({"message": "User registered successfully"}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
-    user = User.query.filter_by(username=data["username"], password=data["password"]).first()
-    if not user:
+    user = User.query.filter_by(email=data["email"]).first()
+    if not user or not user.check_password(data["password"]):
         return jsonify({"error": "Invalid credentials"}), 401
     token = create_access_token(identity=user.id)
     return jsonify({"access_token": token}), 200
+
+@app.route("/me", methods=["GET"])
+@jwt_required()
+def get_current_user():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role
+    }), 200
 
 
 # CART
