@@ -28,17 +28,35 @@ def initiate_payment():
     if order.payment_status == "PAID":
         return jsonify({"error": "Order already paid"}), 400
     
+    # Check if Payd credentials are configured
+    if not os.getenv('PAYD_API_USERNAME') or not os.getenv('PAYD_API_PASSWORD'):
+        return jsonify({
+            "error": "Payment service not configured. Please use /payments/simulate for testing."
+        }), 503
+    
     callback_url = f"{os.getenv('APP_URL', 'http://localhost:5000')}/payments/callback"
     
-    response, status = PaydPaymentService.initiate_payment(
-        amount=order.total_price,
-        phone_number=phone_number,
-        narration=f"Payment for Order #{order.id}",
-        callback_url=callback_url,
-        transaction_ref=order.transaction_ref
-    )
-    
-    return jsonify(response), status
+    try:
+        response, status = PaydPaymentService.initiate_payment(
+            amount=order.total_price,
+            phone_number=phone_number,
+            narration=f"Payment for Order #{order.id}",
+            callback_url=callback_url,
+            transaction_ref=order.transaction_ref
+        )
+        
+        # If Payd returns an error, wrap it properly
+        if status >= 400:
+            return jsonify({
+                "error": "Payment service error. Please use /payments/simulate for testing.",
+                "details": response
+            }), 503
+        
+        return jsonify(response), status
+    except Exception as e:
+        return jsonify({
+            "error": "Payment service unavailable. Please use /payments/simulate for testing."
+        }), 503
 
 @payment_bp.route("/payments/simulate", methods=["POST"])
 @jwt_required()
