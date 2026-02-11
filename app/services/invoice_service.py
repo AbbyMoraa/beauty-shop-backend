@@ -1,6 +1,6 @@
-import uuid
 from app.models.invoice import Invoice
-from app.extensions import db
+from models import db
+import uuid
 
 class InvoiceService:
     @staticmethod

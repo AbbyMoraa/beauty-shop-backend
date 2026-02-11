@@ -1,9 +1,8 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models.order import Order
+from models import Order, db
 from app.models.invoice import Invoice
 from app.models.address import Address
-from app.extensions import db
 from app.services.payment_service import PaydPaymentService
 from app.services.invoice_service import InvoiceService
 import os
@@ -129,23 +128,41 @@ def get_invoice(order_id):
 @payment_bp.route("/addresses", methods=["POST"])
 @jwt_required()
 def create_address():
-    user_id = get_jwt_identity()
-    data = request.get_json()
-    
-    address = Address(
-        user_id=user_id,
-        full_name=data.get("full_name"),
-        phone_number=data.get("phone_number"),
-        address_line=data.get("address_line"),
-        city=data.get("city"),
-        postal_code=data.get("postal_code"),
-        address_type=data.get("address_type", "billing")
-    )
-    
-    db.session.add(address)
-    db.session.commit()
-    
-    return jsonify({"message": "Address created", "id": address.id}), 201
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        print("\n=== ADDRESS DATA RECEIVED ===")
+        print(f"User ID: {user_id}")
+        print(f"Data: {data}")
+        print("============================\n")
+        
+        # Validate required fields
+        required_fields = ["full_name", "phone_number", "address_line", "city"]
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        
+        if missing_fields:
+            error_msg = f"Missing required fields: {', '.join(missing_fields)}"
+            print(f"ERROR: {error_msg}")
+            return jsonify({"error": error_msg}), 400
+        
+        address = Address(
+            user_id=user_id,
+            full_name=data.get("full_name"),
+            phone_number=data.get("phone_number"),
+            address_line=data.get("address_line"),
+            city=data.get("city"),
+            postal_code=data.get("postal_code"),
+            address_type=data.get("address_type", "billing")
+        )
+        
+        db.session.add(address)
+        db.session.commit()
+        
+        return jsonify({"message": "Address created", "id": address.id}), 201
+    except Exception as e:
+        print(f"\n!!! EXCEPTION: {str(e)} !!!\n")
+        return jsonify({"error": str(e)}), 500
 
 @payment_bp.route("/addresses", methods=["GET"])
 @jwt_required()

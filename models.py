@@ -17,6 +17,8 @@ class Order(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     total_price = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default="pending")
+    transaction_ref = db.Column(db.String(100), unique=True, nullable=True)
+    payment_status = db.Column(db.String(20), default="PENDING")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     items = db.relationship("OrderItem", backref="order", lazy=True)

@@ -1,4 +1,4 @@
-from app.extensions import db
+from models import db
 from datetime import datetime
 
 class Invoice(db.Model):

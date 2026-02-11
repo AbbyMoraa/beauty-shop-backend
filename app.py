@@ -10,7 +10,7 @@ import os
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:///beauty_shop.db")
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secret-key")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -42,18 +42,21 @@ def home():
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
+    
+    username = data.get("username") or data.get("email")
+    password = data.get("password")
 
     # validate required fields
-    if not all(k in data for k in ("username", "password")):
-        return jsonify({"error": "Username and password are required"}), 400
+    if not username or not password:
+        return jsonify({"error": "Username/email and password are required"}), 400
 
     # check if username already exists
-    if User.query.filter_by(username=data["username"]).first():
+    if User.query.filter_by(username=username).first():
         return jsonify({"error": "Username already exists"}), 400
 
     # create user and hash password
-    user = User(username=data["username"])
-    user.set_password(data["password"])  # hash the password
+    user = User(username=username)
+    user.set_password(password)
 
     db.session.add(user)
     db.session.commit()
@@ -64,10 +67,16 @@ def register():
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
-    user = User.query.filter_by(username=data["username"]).first()
+    username = data.get("username") or data.get("email")
+    password = data.get("password")
+    
+    if not username or not password:
+        return jsonify({"error": "Username/email and password are required"}), 400
+    
+    user = User.query.filter_by(username=username).first()
 
     # check password using user model method
-    if not user or not user.check_password(data["password"]):
+    if not user or not user.check_password(password):
         return jsonify({"error": "Invalid credentials"}), 401
 
     token = create_access_token(identity=user.id)
@@ -148,4 +157,4 @@ if __name__ == "__main__":
         print("\nRegistered routes:")
         for rule in app.url_map.iter_rules():
             print(f"  {rule}")
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
