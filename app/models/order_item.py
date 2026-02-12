@@ -10,3 +10,14 @@ class OrderItem(db.Model):
     unit_price = db.Column(db.Float, nullable=False)
     
     product = db.relationship('Product', backref='order_items', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'order_id': self.order_id,
+            'product_id': self.product_id,
+            'quantity': self.quantity,
+            'unit_price': self.unit_price,
+            'subtotal': self.quantity * self.unit_price,
+            'product_name': self.product.name if self.product else None
+        }
