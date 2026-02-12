@@ -12,7 +12,7 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:///beauty_shop.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("SQLALCHEMY_DATABASE_URI", "postgresql://ahmed:ahmed123@localhost/beauty_shop")
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secret-key")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -115,12 +115,9 @@ def login():
     token = create_access_token(identity=user.id)
     return jsonify({
         "access_token": token,
-        "user": {
-            "id": user.id,
-            "name": user.username,
-            "email": user.email,
-            "role": user.role
-        }
+        "username": user.username,
+        "role": user.role,
+        "user_id": user.id
     }), 200
 
 @app.route("/me", methods=["GET"])
@@ -147,6 +144,16 @@ def get_users():
         "role": u.role,
         "created_at": str(u.created_at)
     } for u in users])
+
+@app.route("/users/<int:id>", methods=["DELETE"])
+@jwt_required()
+def delete_user(id):
+    user = User.query.get(id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({"message": "User deleted"}), 200
 
 @app.route("/cart", methods=["GET"])
 @jwt_required()
@@ -213,6 +220,22 @@ def checkout():
     db.session.commit()
 
     return jsonify({"message": "checkout complete", "order_id": order.id, "total": total}), 201
+
+@app.route("/orders", methods=["GET"])
+@jwt_required()
+def get_orders():
+    user_id = get_jwt_identity()
+    orders = Order.query.filter_by(user_id=user_id).all()
+    return jsonify([{
+        "id": o.id,
+        "total_price": o.total_price,
+        "created_at": str(o.created_at),
+        "items": [{
+            "product_id": item.product_id,
+            "quantity": item.quantity,
+            "unit_price": item.unit_price
+        } for item in o.items]
+    } for o in orders])
 
 if __name__ == "__main__":
     with app.app_context():
