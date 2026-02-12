@@ -9,7 +9,6 @@ def create_app():
     app.config["SECRET_KEY"] = "supersecretkey"
 
     db.init_app(app)
-    migrate.init_app(app, db)
 
     # ONLY register routes that actually exist
     try:

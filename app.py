@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
 from flask_swagger_ui import get_swaggerui_blueprint
-from models import db, User, Product, CartItem, Order, OrderItem
+from models import db, User, Product, CartItem, Order, OrderItem, Category
 from app.routes.product_routes import product_bp
 from app.routes.payment_routes import payment_bp
 from dotenv import load_dotenv
@@ -40,13 +40,13 @@ def home():
         "docs": "/docs",
         "endpoints": {
             "products": "/products",
-            "categories": "/categories",
-            "cart": "/cart",
-            "checkout": "/checkout",
+            "admin": "/admin",
             "auth": {
                 "register": "/register",
                 "login": "/login"
-            }
+            },
+            "cart": "/cart",
+            "checkout": "/checkout"
         }
     })
 
@@ -56,39 +56,97 @@ def swagger_spec():
         import json
         return jsonify(json.load(f))
 
+@app.route("/products", methods=["GET"])
+def get_products():
+    products = Product.query.all()
+    return jsonify([p.to_dict() for p in products])
+
+@app.route("/products/<int:id>", methods=["GET"])
+def get_product(id):
+    product = Product.query.get(id)
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+    return jsonify(product.to_dict())
+
+@app.route("/categories", methods=["GET"])
+def get_categories():
+    categories = Category.query.all()
+    return jsonify([c.to_dict() for c in categories])
+
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
-    username = data.get("username") or data.get("email")
+    email = data.get("email")
+    username = data.get("username") or (email.split("@")[0] if email else None)
     password = data.get("password")
 
     if not username or not password:
         return jsonify({"error": "missing username or password"}), 400
 
+    if email and User.query.filter_by(email=email).first():
+        return jsonify({"error": "email already exists"}), 400
+    
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "user already exists"}), 400
 
-    user = User(username=username)
+    user = User(username=username, email=email)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
 
     return jsonify({"message": "registered successfully"}), 201
 
-
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
-    username = data.get("username") or data.get("email")
+    email = data.get("email")
+    username = data.get("username")
     password = data.get("password")
     
-    user = User.query.filter_by(username=username).first()
+    user = None
+    if email:
+        user = User.query.filter_by(email=email).first()
+    elif username:
+        user = User.query.filter_by(username=username).first()
+    
     if not user or not user.check_password(password):
         return jsonify({"error": "wrong username or password"}), 401
 
     token = create_access_token(identity=user.id)
-    return jsonify({"access_token": token}), 200
+    return jsonify({
+        "access_token": token,
+        "user": {
+            "id": user.id,
+            "name": user.username,
+            "email": user.email,
+            "role": user.role
+        }
+    }), 200
 
+@app.route("/me", methods=["GET"])
+@jwt_required()
+def get_current_user():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "id": user.id,
+        "name": user.username,
+        "email": user.email,
+        "role": user.role
+    }), 200
+
+@app.route("/users", methods=["GET"])
+def get_users():
+    users = User.query.all()
+    return jsonify([{
+        "id": u.id,
+        "username": u.username,
+        "email": u.email,
+        "role": u.role,
+        "created_at": str(u.created_at)
+    } for u in users])
 
 @app.route("/cart", methods=["GET"])
 @jwt_required()
