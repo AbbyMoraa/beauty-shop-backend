@@ -231,6 +231,7 @@ def get_orders():
     return jsonify([{
         "id": o.id,
         "total_price": o.total_price,
+        "status": o.status,
         "created_at": str(o.created_at),
         "items": [{
             "product_id": item.product_id,
