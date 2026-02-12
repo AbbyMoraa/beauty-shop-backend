@@ -5,6 +5,7 @@ from flask_swagger_ui import get_swaggerui_blueprint
 from models import db, User, Product, CartItem, Order, OrderItem, Category
 from app.routes.product_routes import product_bp
 from app.routes.payment_routes import payment_bp
+from admin.routes.admin_routes import admin_bp
 from dotenv import load_dotenv
 import os
 
@@ -32,6 +33,7 @@ app.register_blueprint(swaggerui_bp, url_prefix=SWAGGER_URL)
 # Register blueprints
 app.register_blueprint(product_bp)
 app.register_blueprint(payment_bp)
+app.register_blueprint(admin_bp)
 
 @app.route("/")
 def home():
@@ -239,6 +241,35 @@ def get_orders():
             "unit_price": item.unit_price
         } for item in o.items]
     } for o in orders])
+
+@app.route("/analytics/products", methods=["GET"])
+@jwt_required()
+def analytics_products():
+    from sqlalchemy import func
+    products = db.session.query(
+        Product.id, Product.name,
+        func.count(OrderItem.id).label('sales'),
+        func.sum(OrderItem.quantity * OrderItem.unit_price).label('revenue')
+    ).join(OrderItem).group_by(Product.id).all()
+    
+    return jsonify([{
+        'id': p.id, 'name': p.name, 'sales': p.sales, 'revenue': float(p.revenue or 0)
+    } for p in products])
+
+@app.route("/analytics/orders", methods=["GET"])
+@jwt_required()
+def analytics_orders():
+    from sqlalchemy import func
+    total_orders = Order.query.count()
+    total_revenue = db.session.query(func.sum(Order.total_price)).scalar() or 0
+    pending = Order.query.filter_by(status='pending').count()
+    
+    return jsonify({
+        'totalOrders': total_orders,
+        'totalRevenue': float(total_revenue),
+        'averageOrder': float(total_revenue / total_orders) if total_orders > 0 else 0,
+        'pendingOrders': pending
+    })
 
 if __name__ == "__main__":
     with app.app_context():
