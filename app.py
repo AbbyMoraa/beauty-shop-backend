@@ -202,6 +202,8 @@ def checkout():
     total = 0
     for item in cart_items:
         product = Product.query.get(item.product_id)
+        if not product:
+            continue
         total += product.price * item.quantity
         
         order_item = OrderItem(
