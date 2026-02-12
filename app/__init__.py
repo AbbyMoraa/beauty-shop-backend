@@ -7,11 +7,11 @@ from app.routes.auth_routes import auth_bp
 
 def create_app():
     app = Flask(__name__)
-    app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://ahmed:ahmed123@localhost/beauty_shop"
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///beauty_shop.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["JWT_SECRET_KEY"] = "your-secret-key-change-in-production"
+    app.config["JWT_SECRET_KEY"] = "super-secret-key"
     
-    CORS(app, origins=["http://localhost:5173"])
+    CORS(app, resources={r"/*": {"origins": "*"}})
     db.init_app(app)
     JWTManager(app)
     

@@ -1,11 +1,9 @@
-from app import Flask
-from models import db, Category, Product
+from app import create_app
+from app.models.category import Category
+from app.models.product import Product
+from app.extensions import db
 
-app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://ahmed:ahmed123@localhost/beauty_shop"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-db.init_app(app)
+app = create_app()
 
 with app.app_context():
     

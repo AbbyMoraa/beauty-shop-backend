@@ -17,8 +17,6 @@ class Order(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     total_price = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default="pending")
-    transaction_ref = db.Column(db.String(100), unique=True, nullable=True)
-    payment_status = db.Column(db.String(20), default="PENDING")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     items = db.relationship("OrderItem", backref="order", lazy=True)
@@ -72,13 +70,17 @@ class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=True)
-    password_hash = db.Column(db.String(256), nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)  # hashed password
     role = db.Column(db.String(20), default="customer")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Hash password
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
+    # Check password
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+  
+        
