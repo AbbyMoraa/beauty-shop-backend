@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
+from flask_swagger_ui import get_swaggerui_blueprint
 from models import db, User, Product, CartItem, Order, OrderItem
 from app.routes.product_routes import product_bp
 from app.routes.payment_routes import payment_bp
@@ -18,6 +19,16 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 jwt = JWTManager(app)
 
+# Swagger UI setup
+SWAGGER_URL = '/docs'
+API_URL = '/swagger.json'
+swaggerui_bp = get_swaggerui_blueprint(
+    SWAGGER_URL,
+    API_URL,
+    config={'app_name': "Beauty Shop API"}
+)
+app.register_blueprint(swaggerui_bp, url_prefix=SWAGGER_URL)
+
 # Register blueprints
 app.register_blueprint(product_bp)
 app.register_blueprint(payment_bp)
@@ -26,6 +37,7 @@ app.register_blueprint(payment_bp)
 def home():
     return jsonify({
         "message": "Beauty Shop API",
+        "docs": "/docs",
         "endpoints": {
             "products": "/products",
             "categories": "/categories",
@@ -38,30 +50,30 @@ def home():
         }
     })
 
-# -------------------- AUTH --------------------
+@app.route("/swagger.json")
+def swagger_spec():
+    with open('swagger.json', 'r') as f:
+        import json
+        return jsonify(json.load(f))
+
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
-    
     username = data.get("username") or data.get("email")
     password = data.get("password")
 
-    # validate required fields
     if not username or not password:
-        return jsonify({"error": "Username/email and password are required"}), 400
+        return jsonify({"error": "missing username or password"}), 400
 
-    # check if username already exists
     if User.query.filter_by(username=username).first():
-        return jsonify({"error": "Username already exists"}), 400
+        return jsonify({"error": "user already exists"}), 400
 
-    # create user and hash password
     user = User(username=username)
     user.set_password(password)
-
     db.session.add(user)
     db.session.commit()
 
-    return jsonify({"message": "User registered"}), 201
+    return jsonify({"message": "registered successfully"}), 201
 
 
 @app.route("/login", methods=["POST"])
@@ -70,91 +82,81 @@ def login():
     username = data.get("username") or data.get("email")
     password = data.get("password")
     
-    if not username or not password:
-        return jsonify({"error": "Username/email and password are required"}), 400
-    
     user = User.query.filter_by(username=username).first()
-
-    # check password using user model method
     if not user or not user.check_password(password):
-        return jsonify({"error": "Invalid credentials"}), 401
+        return jsonify({"error": "wrong username or password"}), 401
 
     token = create_access_token(identity=user.id)
     return jsonify({"access_token": token}), 200
 
 
-# -------------------- CART --------------------
 @app.route("/cart", methods=["GET"])
 @jwt_required()
 def view_cart():
     user_id = get_jwt_identity()
     items = CartItem.query.filter_by(user_id=user_id).all()
-    return jsonify([
-        {
+    cart = []
+    for i in items:
+        product = Product.query.get(i.product_id)
+        cart.append({
             "product_id": i.product_id,
             "quantity": i.quantity,
-            "product_name": Product.query.get(i.product_id).name,
-            "price": Product.query.get(i.product_id).price
-        }
-        for i in items
-    ])
+            "product_name": product.name,
+            "price": product.price
+        })
+    return jsonify(cart)
 
 @app.route("/cart", methods=["POST"])
 @jwt_required()
 def add_to_cart():
     user_id = get_jwt_identity()
     data = request.get_json()
-    product_id = data["product_id"]
-    quantity = data.get("quantity", 1)
-
-    item = CartItem(user_id=user_id, product_id=product_id, quantity=quantity)
+    
+    item = CartItem(
+        user_id=user_id, 
+        product_id=data["product_id"], 
+        quantity=data.get("quantity", 1)
+    )
     db.session.add(item)
     db.session.commit()
-    return jsonify({"message": "Item added to cart"}), 201
+    return jsonify({"message": "added to cart"}), 201
 
-# -------------------- CHECKOUT --------------------
 @app.route("/checkout", methods=["POST"])
 @jwt_required()
 def checkout():
     user_id = get_jwt_identity()
     cart_items = CartItem.query.filter_by(user_id=user_id).all()
+    
     if not cart_items:
-        return jsonify({"error": "Cart is empty"}), 400
+        return jsonify({"error": "cart is empty"}), 400
 
-    total = 0
     order = Order(user_id=user_id, total_price=0)
     db.session.add(order)
     db.session.flush()
 
+    total = 0
     for item in cart_items:
         product = Product.query.get(item.product_id)
-        if not product:
-            return jsonify({"error": f"Product {item.product_id} not found"}), 404
-
-        unit_price = product.price
-        total += unit_price * item.quantity
-
+        total += product.price * item.quantity
+        
         order_item = OrderItem(
             order_id=order.id,
             product_id=item.product_id,
             quantity=item.quantity,
-            unit_price=unit_price
+            unit_price=product.price
         )
         db.session.add(order_item)
 
     order.total_price = total
     db.session.commit()
 
+    # clear cart
     CartItem.query.filter_by(user_id=user_id).delete()
     db.session.commit()
 
-    return jsonify({"message": "Checkout successful", "order_id": order.id, "total": total}), 201
+    return jsonify({"message": "checkout complete", "order_id": order.id, "total": total}), 201
 
-# -------------------- MAIN --------------------
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-        print("\nRegistered routes:")
-        for rule in app.url_map.iter_rules():
-            print(f"  {rule}")
     app.run(debug=True, host='0.0.0.0', port=5000)

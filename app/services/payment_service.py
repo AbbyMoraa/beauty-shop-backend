@@ -2,18 +2,15 @@ import os
 import requests
 from requests.auth import HTTPBasicAuth
 
-PAYD_BASE_URL = os.getenv("PAYD_BASE_URL")
-PAYD_USERNAME = os.getenv("PAYD_API_USERNAME")
-PAYD_PASSWORD = os.getenv("PAYD_API_PASSWORD")
-
-
 class PaydPaymentService:
     @staticmethod
     def initiate_payment(amount, phone_number, narration, callback_url, transaction_ref):
-        url = f"{PAYD_BASE_URL}/payments"
+        url = f"{os.getenv('PAYD_BASE_URL')}/payments"
+        username = os.getenv('PAYD_API_USERNAME')
+        password = os.getenv('PAYD_API_PASSWORD')
 
         payload = {
-            "username": PAYD_USERNAME,
+            "username": username,
             "channel": "MPESA",
             "amount": amount,
             "phone_number": phone_number,
@@ -24,8 +21,7 @@ class PaydPaymentService:
         }
 
         try:
-            response = requests.post(url, json=payload,
-                                     auth=HTTPBasicAuth(PAYD_USERNAME, PAYD_PASSWORD))
-            return response.json(), response.status_code
+            resp = requests.post(url, json=payload, auth=HTTPBasicAuth(username, password))
+            return resp.json(), resp.status_code
         except Exception as e:
             return {"error": str(e)}, 500

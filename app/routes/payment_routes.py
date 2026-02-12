@@ -16,62 +16,52 @@ def initiate_payment():
     data = request.get_json()
     
     order_id = data.get("order_id")
-    phone_number = data.get("phone_number")
+    phone = data.get("phone_number")
     
-    if not order_id or not phone_number:
-        return jsonify({"error": "Order ID and phone number required"}), 400
+    if not order_id or not phone:
+        return jsonify({"error": "need order_id and phone_number"}), 400
     
     order = Order.query.filter_by(id=order_id, user_id=user_id).first()
     if not order:
-        return jsonify({"error": "Order not found"}), 404
+        return jsonify({"error": "order not found"}), 404
     
     if order.payment_status == "PAID":
-        return jsonify({"error": "Order already paid"}), 400
+        return jsonify({"error": "already paid"}), 400
     
-    # Check if Payd credentials are configured
     if not os.getenv('PAYD_API_USERNAME') or not os.getenv('PAYD_API_PASSWORD'):
-        return jsonify({
-            "error": "Payment service not configured. Please use /payments/simulate for testing."
-        }), 503
+        return jsonify({"error": "payment service not set up, use /payments/simulate instead"}), 503
     
-    callback_url = f"{os.getenv('APP_URL', 'http://localhost:5000')}/payments/callback"
+    callback = f"{os.getenv('APP_URL', 'http://localhost:5000')}/payments/callback"
     
     try:
         response, status = PaydPaymentService.initiate_payment(
             amount=order.total_price,
-            phone_number=phone_number,
-            narration=f"Payment for Order #{order.id}",
-            callback_url=callback_url,
+            phone_number=phone,
+            narration=f"Order #{order.id}",
+            callback_url=callback,
             transaction_ref=order.transaction_ref
         )
         
-        # If Payd returns an error, wrap it properly
         if status >= 400:
-            return jsonify({
-                "error": "Payment service error. Please use /payments/simulate for testing.",
-                "details": response
-            }), 503
+            return jsonify({"error": "payment failed, try /payments/simulate"}), 503
         
         return jsonify(response), status
     except Exception as e:
-        return jsonify({
-            "error": "Payment service unavailable. Please use /payments/simulate for testing."
-        }), 503
+        return jsonify({"error": "payment service down"}), 503
 
 @payment_bp.route("/payments/simulate", methods=["POST"])
 @jwt_required()
 def simulate_payment():
     user_id = get_jwt_identity()
     data = request.get_json()
-    
     order_id = data.get("order_id")
     
     if not order_id:
-        return jsonify({"error": "Order ID required"}), 400
+        return jsonify({"error": "need order_id"}), 400
     
     order = Order.query.filter_by(id=order_id, user_id=user_id).first()
     if not order:
-        return jsonify({"error": "Order not found"}), 404
+        return jsonify({"error": "order not found"}), 404
     
     order.payment_status = "PAID"
     order.status = "confirmed"
@@ -80,7 +70,7 @@ def simulate_payment():
     invoice = InvoiceService.create_invoice(order)
     
     return jsonify({
-        "message": "Payment simulated successfully",
+        "message": "payment successful",
         "order_id": order.id,
         "payment_status": order.payment_status,
         "invoice_number": invoice.invoice_number
@@ -89,15 +79,15 @@ def simulate_payment():
 @payment_bp.route("/payments/callback", methods=["POST"])
 def payd_webhook():
     data = request.get_json()
-    transaction_ref = data.get("reference")
+    ref = data.get("reference")
     status = data.get("status")
 
-    if not transaction_ref:
-        return jsonify({"error": "Missing transaction reference"}), 400
+    if not ref:
+        return jsonify({"error": "no reference"}), 400
 
-    order = Order.query.filter_by(transaction_ref=transaction_ref).first()
+    order = Order.query.filter_by(transaction_ref=ref).first()
     if not order:
-        return jsonify({"error": "Order not found"}), 404
+        return jsonify({"error": "order not found"}), 404
 
     if status == "SUCCESS":
         order.payment_status = "PAID"
@@ -107,8 +97,7 @@ def payd_webhook():
         order.payment_status = "FAILED"
     
     db.session.commit()
-
-    return jsonify({"message": "Webhook processed"}), 200
+    return jsonify({"message": "ok"}), 200
 
 @payment_bp.route("/invoices/<int:order_id>", methods=["GET"])
 @jwt_required()
@@ -117,11 +106,19 @@ def get_invoice(order_id):
     
     order = Order.query.filter_by(id=order_id, user_id=user_id).first()
     if not order:
-        return jsonify({"error": "Order not found"}), 404
+        return jsonify({"error": "order not found"}), 404
     
     invoice = Invoice.query.filter_by(order_id=order.id).first()
     if not invoice:
-        return jsonify({"error": "Invoice not found"}), 404
+        return jsonify({"error": "no invoice yet"}), 404
+    
+    items = []
+    for item in order.items:
+        items.append({
+            "product_id": item.product_id,
+            "quantity": item.quantity,
+            "unit_price": item.unit_price
+        })
     
     return jsonify({
         "invoice_number": invoice.invoice_number,
@@ -132,55 +129,35 @@ def get_invoice(order_id):
         "order_details": {
             "transaction_ref": order.transaction_ref,
             "payment_status": order.payment_status,
-            "items": [
-                {
-                    "product_id": item.product_id,
-                    "quantity": item.quantity,
-                    "unit_price": item.unit_price
-                }
-                for item in order.items
-            ]
+            "items": items
         }
     }), 200
 
 @payment_bp.route("/addresses", methods=["POST"])
 @jwt_required()
 def create_address():
-    try:
-        user_id = get_jwt_identity()
-        data = request.get_json()
-        
-        print("\n=== ADDRESS DATA RECEIVED ===")
-        print(f"User ID: {user_id}")
-        print(f"Data: {data}")
-        print("============================\n")
-        
-        # Validate required fields
-        required_fields = ["full_name", "phone_number", "address_line", "city"]
-        missing_fields = [field for field in required_fields if not data.get(field)]
-        
-        if missing_fields:
-            error_msg = f"Missing required fields: {', '.join(missing_fields)}"
-            print(f"ERROR: {error_msg}")
-            return jsonify({"error": error_msg}), 400
-        
-        address = Address(
-            user_id=user_id,
-            full_name=data.get("full_name"),
-            phone_number=data.get("phone_number"),
-            address_line=data.get("address_line"),
-            city=data.get("city"),
-            postal_code=data.get("postal_code"),
-            address_type=data.get("address_type", "billing")
-        )
-        
-        db.session.add(address)
-        db.session.commit()
-        
-        return jsonify({"message": "Address created", "id": address.id}), 201
-    except Exception as e:
-        print(f"\n!!! EXCEPTION: {str(e)} !!!\n")
-        return jsonify({"error": str(e)}), 500
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    required = ["full_name", "phone_number", "address_line", "city"]
+    for field in required:
+        if not data.get(field):
+            return jsonify({"error": f"missing {field}"}), 400
+    
+    address = Address(
+        user_id=user_id,
+        full_name=data.get("full_name"),
+        phone_number=data.get("phone_number"),
+        address_line=data.get("address_line"),
+        city=data.get("city"),
+        postal_code=data.get("postal_code"),
+        address_type=data.get("address_type", "billing")
+    )
+    
+    db.session.add(address)
+    db.session.commit()
+    
+    return jsonify({"message": "address saved", "id": address.id}), 201
 
 @payment_bp.route("/addresses", methods=["GET"])
 @jwt_required()
@@ -188,8 +165,9 @@ def get_addresses():
     user_id = get_jwt_identity()
     addresses = Address.query.filter_by(user_id=user_id).all()
     
-    return jsonify([
-        {
+    result = []
+    for addr in addresses:
+        result.append({
             "id": addr.id,
             "full_name": addr.full_name,
             "phone_number": addr.phone_number,
@@ -197,6 +175,5 @@ def get_addresses():
             "city": addr.city,
             "postal_code": addr.postal_code,
             "address_type": addr.address_type
-        }
-        for addr in addresses
-    ]), 200
+        })
+    return jsonify(result), 200
