@@ -1,6 +1,3 @@
-# simple test app for admin routes
-# run this to test admin endpoints without the main app
-
 from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token
@@ -9,13 +6,11 @@ from routes.admin_routes import admin_bp
 app = Flask(__name__)
 CORS(app)
 
-# basic config
-app.config['JWT_SECRET_KEY'] = 'test-secret-key-dont-use-in-production'  # change this!
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = False  # tokens don't expire for testing
+app.config['JWT_SECRET_KEY'] = 'test-secret-key-dont-use-in-production'
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = False
 
 jwt = JWTManager(app)
 
-# register the admin blueprint
 app.register_blueprint(admin_bp)
 
 @app.route('/')
@@ -32,11 +27,8 @@ def home():
         'note': 'All admin endpoints need JWT token except /login'
     }
 
-# simple login for testing - just returns a token
 @app.route('/login', methods=['POST'])
 def login():
-    # in real app this would check username/password
-    # for testing just give anyone a token
     token = create_access_token(identity='test_admin')
     return {
         'access_token': token,

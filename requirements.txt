@@ -1,15 +1,9 @@
-# Flask and extensions
 Flask==2.3.3
 Flask-SQLAlchemy==3.0.5
 Flask-JWT-Extended==4.5.3
 Flask-CORS==6.0.2
-
-# Database
 psycopg2-binary==2.9.11
-
-# PDF generation
 reportlab==4.0.7
-
-# might need these later
-# python-dotenv
-# flask-migrate
+python-dotenv==1.0.0
+flask-swagger-ui==4.11.1
+gunicorn==21.2.0
