@@ -114,7 +114,7 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({"error": "wrong username or password"}), 401
 
-    token = create_access_token(identity=user.id)
+    token = create_access_token(identity=str(user.id))
     return jsonify({
         "access_token": token,
         "username": user.username,
@@ -125,7 +125,7 @@ def login():
 @app.route("/me", methods=["GET"])
 @jwt_required()
 def get_current_user():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
@@ -160,7 +160,7 @@ def delete_user(id):
 @app.route("/cart", methods=["GET"])
 @jwt_required()
 def view_cart():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     items = CartItem.query.filter_by(user_id=user_id).all()
     cart = []
     for i in items:
@@ -176,7 +176,7 @@ def view_cart():
 @app.route("/cart", methods=["POST"])
 @jwt_required()
 def add_to_cart():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     data = request.get_json()
     
     item = CartItem(
@@ -191,7 +191,7 @@ def add_to_cart():
 @app.route("/checkout", methods=["POST"])
 @jwt_required()
 def checkout():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     cart_items = CartItem.query.filter_by(user_id=user_id).all()
     
     if not cart_items:
@@ -228,7 +228,7 @@ def checkout():
 @app.route("/orders", methods=["GET"])
 @jwt_required()
 def get_orders():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     orders = Order.query.filter_by(user_id=user_id).all()
     return jsonify([{
         "id": o.id,
