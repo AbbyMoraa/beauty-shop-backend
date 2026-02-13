@@ -5,3 +5,4 @@ Flask-CORS==6.0.2
 psycopg2-binary==2.9.11
 reportlab==4.0.7
 Flask-Swagger-UI==3.36.0
+requests==2.25.1
