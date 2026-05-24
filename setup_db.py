@@ -3,7 +3,7 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
-from app import app
+from application import app
 from models import db, Product, Category
 
 print("Creating database tables...")
