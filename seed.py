@@ -1,17 +1,7 @@
-from flask import Flask
 from models import db, Category, Product
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("SQLALCHEMY_DATABASE_URI", "postgresql://ahmed:ahmed123@localhost/beauty_shop")
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-db.init_app(app)
 
 def seed_products():
-    with app.app_context():
+    if True:  # runs in caller's app context
         # Clear existing data
         Product.query.delete()
         Category.query.delete()
@@ -107,4 +97,13 @@ def seed_products():
         print(f"Created {Product.query.count()} products")
 
 if __name__ == "__main__":
-    seed_products()
+    from flask import Flask
+    from dotenv import load_dotenv
+    import os
+    load_dotenv()
+    _app = Flask(__name__)
+    _app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("SQLALCHEMY_DATABASE_URI")
+    _app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    db.init_app(_app)
+    with _app.app_context():
+        seed_products()
