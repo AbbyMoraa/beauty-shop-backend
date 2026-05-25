@@ -2,8 +2,8 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-import app
-app = app.app
+import application
+app = application.app
 
 # Create tables if they don't exist (safe to run multiple times)
 try:
