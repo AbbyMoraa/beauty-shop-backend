@@ -1,5 +1,5 @@
 from flask import Flask
-from app.extensions import db
+from core.extensions import db
 
 def create_app():
     app = Flask(__name__)
@@ -12,7 +12,7 @@ def create_app():
 
     # ONLY register routes that actually exist
     try:
-        from app.routes.auth_routes import auth_bp
+        from core.routes.auth_routes import auth_bp
         app.register_blueprint(auth_bp, url_prefix="/api/auth")
     except ImportError:
         print("Auth routes not yet available")

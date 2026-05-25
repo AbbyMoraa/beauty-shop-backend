@@ -1,5 +1,5 @@
 from flask import Blueprint
-from app.controllers.product_controller import ProductController
+from core.controllers.product_controller import ProductController
 
 product_bp = Blueprint('products', __name__)
 

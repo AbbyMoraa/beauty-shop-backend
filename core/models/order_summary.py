@@ -1,4 +1,4 @@
-from app.extensions import db
+from core.extensions import db
 
 class OrderSummary(db.Model):
     __tablename__ = 'order_summary'

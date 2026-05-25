@@ -3,8 +3,8 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
 from flask_swagger_ui import get_swaggerui_blueprint
 from models import db, User, Product, CartItem, Order, OrderItem, Category
-from app.routes.product_routes import product_bp
-from app.routes.payment_routes import payment_bp
+from core.routes.product_routes import product_bp
+from core.routes.payment_routes import payment_bp
 from admin.routes.admin_routes import admin_bp
 from dotenv import load_dotenv
 import os

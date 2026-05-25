@@ -1,10 +1,10 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Order, db
-from app.models.invoice import Invoice
-from app.models.address import Address
-from app.services.payment_service import PaydPaymentService
-from app.services.invoice_service import InvoiceService
+from core.models.invoice import Invoice
+from core.models.address import Address
+from core.services.payment_service import PaydPaymentService
+from core.services.invoice_service import InvoiceService
 import os
 
 payment_bp = Blueprint("payment_bp", __name__)

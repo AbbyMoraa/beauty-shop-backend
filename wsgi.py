@@ -2,8 +2,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-import application
-app = application.app
+from app import app
 
 # Create tables and seed data if empty
 try:

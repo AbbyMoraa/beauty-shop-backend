@@ -1,4 +1,4 @@
-from app.models.invoice import Invoice
+from core.models.invoice import Invoice
 from models import db
 import uuid
 

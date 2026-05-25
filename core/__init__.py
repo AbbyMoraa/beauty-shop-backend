@@ -1,9 +1,9 @@
 from flask import Flask
 from flask_cors import CORS
-from app.extensions import db
+from core.extensions import db
 from flask_jwt_extended import JWTManager
-from app.routes.product_routes import product_bp
-from app.routes.auth_routes import auth_bp
+from core.routes.product_routes import product_bp
+from core.routes.auth_routes import auth_bp
 
 def create_app():
     app = Flask(__name__)
